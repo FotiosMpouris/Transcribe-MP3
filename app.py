@@ -9,12 +9,14 @@ def transcribe_audio(client, audio_file_object):
     Transcribes an audio file object using OpenAI's Whisper API.
     """
     try:
+        # Ensure the file pointer is at the beginning if it was read before or passed around.
+        audio_file_object.seek(0)
         transcript = client.audio.transcriptions.create(
             model="whisper-1",
             file=audio_file_object,
-            response_format="text"  # You can also use "json", "srt", "vtt"
+            response_format="text"
         )
-        return transcript # For "text" response_format, this is the plain text
+        return transcript
     except Exception as e:
         st.error(f"Error during transcription: {e}")
         return None
@@ -22,33 +24,26 @@ def transcribe_audio(client, audio_file_object):
 # --- Streamlit App ---
 st.set_page_config(page_title="MP3 Transcriber", layout="wide")
 
-st.title("🎤 MP3 Audio Transcriber with OpenAI Whisper")
+st.title("🎤 MP3 Audio Transcriber")
 st.markdown("""
 Upload an MP3 file, and this app will transcribe it using OpenAI's Whisper API.
-You'll need to provide your OpenAI API key.
+This app uses a pre-configured API key.
 """)
 
-# --- Sidebar for API Key Input ---
-st.sidebar.header("Configuration")
-api_key_input = st.sidebar.text_input(
-    "Enter your OpenAI API Key:",
-    type="password",
-    help="Get your API key from https://platform.openai.com/api-keys"
-)
-
-# Check if API key is provided via Streamlit Secrets (preferred for deployment)
-# or via user input
-openai_api_key = ""
+# --- API Key Handling (Secrets Only) ---
+openai_api_key = None
 if 'OPENAI_API_KEY' in st.secrets:
     openai_api_key = st.secrets["OPENAI_API_KEY"]
-    st.sidebar.success("API Key loaded from Secrets!")
-elif api_key_input:
-    openai_api_key = api_key_input
-    st.sidebar.info("API Key entered by user.")
+    # st.sidebar.success("OpenAI API Key loaded successfully from Secrets!") # Optional: for debugging if needed
 else:
-    st.sidebar.warning("Please enter your OpenAI API Key above or set it in Streamlit Secrets.")
-    st.warning("Please provide your OpenAI API Key in the sidebar to proceed.")
-    st.stop() # Stop execution if no API key
+    st.error("OpenAI API Key not found in Streamlit Secrets.")
+    st.warning("""
+        Please ensure your OpenAI API Key is configured in your Streamlit Cloud app's Secrets.
+        1. Go to your app settings on Streamlit Community Cloud.
+        2. Navigate to the 'Secrets' section.
+        3. Add a secret with the name `OPENAI_API_KEY` and your API key as the value.
+    """)
+    st.stop() # Stop execution if no API key from secrets
 
 # Initialize OpenAI client
 try:
@@ -68,34 +63,23 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
     st.subheader("Uploaded Audio")
-    # Display audio player
     st.audio(uploaded_file, format='audio/mp3')
 
-    # --- Transcription Button ---
     if st.button("Transcribe Audio", type="primary"):
-        if not openai_api_key:
-            st.error("OpenAI API Key is missing. Please enter it in the sidebar.")
-        else:
-            with st.spinner("Transcribing... Please wait. This may take a few moments."):
-                # The uploaded_file is a file-like object, ready to be used
-                # For some APIs, you might need to save it to a temporary file first,
-                # but OpenAI's client can often handle these directly.
-                # Let's pass the file-like object directly.
-                # Ensure the file pointer is at the beginning if it was read before.
-                uploaded_file.seek(0)
-                transcription_text = transcribe_audio(client, uploaded_file)
+        with st.spinner("Transcribing... Please wait. This may take a few moments."):
+            transcription_text = transcribe_audio(client, uploaded_file)
 
-            if transcription_text:
-                st.subheader("Transcription Result:")
-                st.text_area("Transcription", transcription_text, height=200)
-                st.download_button(
-                    label="Download Transcription as TXT",
-                    data=transcription_text,
-                    file_name=f"{os.path.splitext(uploaded_file.name)[0]}_transcription.txt",
-                    mime="text/plain"
-                )
-            else:
-                st.error("Transcription failed. Please check the error message above.")
+        if transcription_text:
+            st.subheader("Transcription Result:")
+            st.text_area("Transcription", transcription_text, height=200)
+            st.download_button(
+                label="Download Transcription as TXT",
+                data=transcription_text,
+                file_name=f"{os.path.splitext(uploaded_file.name)[0]}_transcription.txt",
+                mime="text/plain"
+            )
+        else:
+            st.error("Transcription failed. Please check for error messages above or ensure the audio is valid.")
 else:
     st.info("Upload an MP3 file to get started.")
 
