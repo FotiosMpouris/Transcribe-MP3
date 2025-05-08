@@ -9,8 +9,7 @@ def transcribe_audio(client, audio_file_object):
     Transcribes an audio file object using OpenAI's Whisper API.
     """
     try:
-        # Ensure the file pointer is at the beginning if it was read before or passed around.
-        audio_file_object.seek(0)
+        audio_file_object.seek(0) # Ensure pointer is at the beginning
         transcript = client.audio.transcriptions.create(
             model="whisper-1",
             file=audio_file_object,
@@ -30,20 +29,49 @@ Upload an MP3 file, and this app will transcribe it using OpenAI's Whisper API.
 This app uses a pre-configured API key.
 """)
 
-# --- API Key Handling (Secrets Only) ---
+# --- API Key Handling (Secrets Only - Corrected for TOML structure) ---
 openai_api_key = None
-if 'OPENAI_API_KEY' in st.secrets:
+api_key_found = False
+
+# Check for the nested structure first
+if "openai" in st.secrets and isinstance(st.secrets["openai"], dict) and "api_key" in st.secrets["openai"]:
+    openai_api_key = st.secrets["openai"]["api_key"]
+    if openai_api_key and isinstance(openai_api_key, str) and openai_api_key.startswith("sk-"):
+        api_key_found = True
+    else:
+        st.error("The 'api_key' found under '[openai]' in secrets is not a valid OpenAI key string.")
+        st.stop()
+elif "OPENAI_API_KEY" in st.secrets: # Fallback for a flat key, though your format is nested
     openai_api_key = st.secrets["OPENAI_API_KEY"]
-    # st.sidebar.success("OpenAI API Key loaded successfully from Secrets!") # Optional: for debugging if needed
-else:
-    st.error("OpenAI API Key not found in Streamlit Secrets.")
-    st.warning("""
+    if openai_api_key and isinstance(openai_api_key, str) and openai_api_key.startswith("sk-"):
+        api_key_found = True
+    else:
+        st.error("The 'OPENAI_API_KEY' found in secrets is not a valid OpenAI key string.")
+        st.stop()
+
+
+if not api_key_found:
+    st.error("OpenAI API Key not found or incorrectly configured in Streamlit Secrets.")
+    st.warning(f"""
         Please ensure your OpenAI API Key is configured in your Streamlit Cloud app's Secrets.
+        Based on your description, it should be in the format:
+
+        ```toml
+        [openai]
+        api_key = "YOUR_API_KEY_HERE"
+        ```
+
+        Current secrets structure detected (or part of it):
+        ```
+        {dict(st.secrets)}
+        ```
+        (Only top-level keys are shown above if secrets are complex. Ensure the `[openai]` table and `api_key` within it exist.)
+
         1. Go to your app settings on Streamlit Community Cloud.
         2. Navigate to the 'Secrets' section.
-        3. Add a secret with the name `OPENAI_API_KEY` and your API key as the value.
+        3. Add/update your secret to match the required structure.
     """)
-    st.stop() # Stop execution if no API key from secrets
+    st.stop()
 
 # Initialize OpenAI client
 try:
