@@ -33,7 +33,7 @@ This app uses a pre-configured API key.
 # --- API Key Handling (Secrets Only) ---
 openai_api_key = None
 if 'OPENAI_API_KEY' in st.secrets:
-   api_key = st.secrets["OPENAI_API_KEY"]
+    openai_api_key = st.secrets["OPENAI_API_KEY"]
     # st.sidebar.success("OpenAI API Key loaded successfully from Secrets!") # Optional: for debugging if needed
 else:
     st.error("OpenAI API Key not found in Streamlit Secrets.")
@@ -47,7 +47,7 @@ else:
 
 # Initialize OpenAI client
 try:
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=openai_api_key)
 except Exception as e:
     st.error(f"Failed to initialize OpenAI client: {e}")
     st.stop()
